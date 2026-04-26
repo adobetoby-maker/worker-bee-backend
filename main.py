@@ -105,6 +105,11 @@ async def health():
         "active_jobs": len([j for j in jobs.values() if j["status"] == "running"])
     }
 
+@app.get("/api/projects")
+async def get_projects():
+    from agent.tools.scaffold import list_projects
+    return {"projects": list_projects()}
+
 @app.get("/api/tags")
 async def tags():
     import httpx
