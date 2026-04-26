@@ -34,6 +34,24 @@ app.use(
 
 app.use(express.json());
 
+// Root endpoint - Welcome message
+app.get("/", (req, res) => {
+  res.json({
+    service: "Worker Bee Blueprint Server",
+    version: "1.0.0",
+    status: "online",
+    endpoints: {
+      health: "/health",
+      websocket: "ws://blueprint.worker-bee.app"
+    },
+    usage: {
+      connect: "WebSocket connection required",
+      action: "Send {action: 'blueprint_paths', idea: '...', features: [...]}"
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({
