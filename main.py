@@ -123,6 +123,40 @@ async def delete_job(job_id: str):
         del jobs[job_id]
     return {"status": "deleted"}
 
+@app.post("/api/morning-report")
+async def receive_morning_report(report_data: dict):
+    """
+    Receive morning report from morning_report.py script.
+    Broadcast to all connected WebSocket clients.
+    """
+    # Broadcast to all active runner WebSockets
+    for tab_id, runner in runners.items():
+        try:
+            await runner.send("morning_report", report_data)
+        except Exception:
+            pass  # Client might be disconnected
+
+    return {"status": "ok", "broadcasted_to": len(runners)}
+
+@app.get("/api/morning-report")
+async def get_morning_report():
+    """
+    Get latest morning report from JSON file.
+    Frontend can poll this or receive via WebSocket.
+    """
+    import pathlib
+    report_file = pathlib.Path.home() / "worker-bee" / "morning-report.json"
+
+    if not report_file.exists():
+        return {"error": "No morning report available yet"}
+
+    try:
+        with open(report_file, 'r') as f:
+            import json
+            return json.load(f)
+    except Exception as e:
+        return {"error": f"Error reading report: {str(e)}"}
+
 @app.websocket("/ws/voice-daemon")
 async def voice_daemon_endpoint(ws: WebSocket):
     global voice_daemon_ws
