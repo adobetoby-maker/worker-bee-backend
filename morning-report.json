@@ -1,0 +1,77 @@
+{
+  "generated_at": "2026-04-26T08:59:13.300616",
+  "report_text": "\u2600\ufe0f WORKER BEE MORNING REPORT\nSunday, April 26, 2026 at 08:59 AM\n\n======================================================================\n\ud83d\udd27 SYSTEM HEALTH\n======================================================================\n\nFASTAPI: \u2705 Running\n  Port: 8001\nBLUEPRINT: \u274c Down\n  Port: 8002\n  Error: All connection attempts failed\nOLLAMA: \u2705 Running\n  Port: 11434\n  Models loaded: 0\nCLOUDFLARE TUNNEL: \u2705 Running\n\n======================================================================\n\ud83c\udf93 PRACTICE LOOP STATUS\n======================================================================\n\n\u2705 No failures in last 24 hours\n\n\u2705 No active circuit breakers\n\n======================================================================\n\ud83c\udf10 PRODUCTION SITES\n======================================================================\n\n\u2705 All sites healthy\n\n\u2705 Up mountainedgeplumbing.com\n  Response time: 0.91s\n\u2705 Up ime-coach.com\n  Response time: 0.95s\n\u2705 Up growyournumber.com\n  Response time: 0.81s\n\u2705 Up language-lens-elite.lovable.app\n  Response time: 2.49s\n\n======================================================================\n\ud83d\udcca GIT STATUS\n======================================================================\n\nBranch: main\nLast commit: 864564d - Initial commit: Worker Bee Backend (9 minutes ago)\n\n\u26a0\ufe0f 4 uncommitted changes\n\n======================================================================\n\ud83d\udd17 QUICK LINKS\n======================================================================\n\n\u2022 Worker Bee Frontend: https://worker-bee.lovable.app\n\u2022 Backend Config: https://bee.tobyandertonmd.com\n\u2022 Blueprint: https://blueprint.worker-bee.app\n\u2022 Backend Repo: https://github.com/adobetoby-maker/worker-bee-backend\n\u2022 Frontend Repo: https://github.com/adobetoby-maker/worker-bee\n\n======================================================================\n\ud83d\udc1d Always buzzing, never sleeping.\n======================================================================\n",
+  "health": {
+    "timestamp": "2026-04-26T08:59:13.300672",
+    "services": {
+      "fastapi": {
+        "status": "\u2705 Running",
+        "port": 8001,
+        "data": {
+          "status": "ok",
+          "service": "worker-bee-agent",
+          "version": "3.2.0",
+          "active_runners": 9,
+          "active_jobs": 0
+        }
+      },
+      "blueprint": {
+        "status": "\u274c Down",
+        "port": 8002,
+        "error": "All connection attempts failed"
+      },
+      "ollama": {
+        "status": "\u2705 Running",
+        "port": 11434,
+        "loaded_models": 0
+      },
+      "cloudflare_tunnel": {
+        "status": "\u2705 Running",
+        "pid": "16745"
+      }
+    }
+  },
+  "practice": {
+    "total_failures_24h": 0,
+    "skills_with_failures": [],
+    "circuit_breakers": []
+  },
+  "sites": [
+    {
+      "site": "mountainedgeplumbing.com",
+      "status": "\u2705 Up",
+      "response_time": "0.91s",
+      "healthy": true
+    },
+    {
+      "site": "ime-coach.com",
+      "status": "\u2705 Up",
+      "response_time": "0.95s",
+      "healthy": true
+    },
+    {
+      "site": "growyournumber.com",
+      "status": "\u2705 Up",
+      "response_time": "0.81s",
+      "healthy": true
+    },
+    {
+      "site": "language-lens-elite.lovable.app",
+      "status": "\u2705 Up",
+      "response_time": "2.49s",
+      "healthy": true
+    }
+  ],
+  "git": {
+    "branch": "main",
+    "last_commit": "864564d - Initial commit: Worker Bee Backend (9 minutes ago)",
+    "uncommitted_changes": true,
+    "changed_files": 4
+  },
+  "summary": {
+    "all_services_up": false,
+    "all_sites_healthy": true,
+    "has_failures": false,
+    "has_circuit_breakers": false
+  }
+}

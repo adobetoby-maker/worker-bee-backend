@@ -841,6 +841,42 @@ Emit status at every step: [MODEL:STEP] what you are doing."""
             applied = apply_changes(project, result["files"])
             await self.send("build_applied", {
                 "files": applied, "project": project})
+
+            # Git commit and GitHub push
+            from .tools.builder import git_commit_build, push_to_github, GITHUB_TOKEN
+            job_id = msg.get("job_id", "manual")
+
+            commit_result = git_commit_build(
+                project_name=project,
+                prompt=prompt,
+                job_id=job_id,
+                files=applied,
+                model="qwen2.5-coder:32b"
+            )
+
+            commit_hash = None
+            if commit_result.get("success") and not commit_result.get("no_changes"):
+                commit_hash = commit_result.get("commit_hash", "")
+                commit_hash_short = commit_hash[:8] if commit_hash else "unknown"
+                await self.emit_status("BUILDER", "COMMIT", f"git commit {commit_hash_short}")
+                await self.send("build_committed", {
+                    "commit_hash": commit_hash,
+                    "files_count": len(applied)
+                })
+
+                # Push to GitHub if token configured
+                if commit_hash and GITHUB_TOKEN:
+                    await self.emit_status("BUILDER", "PUSH", "pushing to GitHub")
+                    push_result = await push_to_github(project)
+
+                    if push_result.get("success") and push_result.get("pushed"):
+                        repo_url = push_result.get("repo_url", "")
+                        await self.emit_status("BUILDER", "PUSHED", f"pushed to GitHub")
+                        await self.send("github_pushed", {
+                            "repo_url": repo_url,
+                            "commit_hash": commit_hash
+                        })
+
             from .tools.devserver import get_url
             url = get_url(project)
             if url:
@@ -861,6 +897,19 @@ Emit status at every step: [MODEL:STEP] what you are doing."""
                         f"Reply YES or describe issues.")
                     await self.send("build_vision", {
                         "vision": vision, "prompt": prompt})
+
+                    # Send build preview
+                    summary = prompt.split('.')[0][:100]
+                    if len(prompt) > 100:
+                        summary += "..."
+
+                    await self.send("build_preview", {
+                        "url": url,
+                        "commit_hash": commit_hash or "no-commit",
+                        "files_changed": applied[:10],
+                        "summary": summary,
+                        "project": project
+                    })
         else:
             await self.emit_status("BUILDER", "ERROR",
                 "build failed")

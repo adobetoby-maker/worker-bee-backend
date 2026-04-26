@@ -19,6 +19,20 @@ runners: Dict[str, AgentRunner] = {}
 jobs: Dict[str, Dict[str, Any]] = {}
 voice_daemon_ws = None
 
+def get_active_build_for_project(project: str) -> str | None:
+    """Check if a project has an active build job. Returns job_id or None."""
+    for job_id, job in jobs.items():
+        if job["status"] in ("queued", "running"):
+            if job["action"] in ("build", "build_start"):
+                if job["payload"].get("project") == project:
+                    return job_id
+    return None
+
+def cancel_job(job_id: str, reason: str = "Cancelled"):
+    """Cancel a running or queued job."""
+    if job_id in jobs:
+        update_job(job_id, "cancelled", f"Cancelled: {reason}")
+
 def create_job(tab_id: str, action: str, payload: dict) -> str:
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     jobs[job_id] = {
@@ -206,6 +220,22 @@ async def ws_endpoint(ws: WebSocket, tab_id: str):
             action = msg.get("action", "")
 
             if action in BACKGROUND_ACTIONS:
+                # Per-project build locking: prevent multiple builds on same project
+                if action in ("build", "build_start"):
+                    project = msg.get("project", "")
+                    if project:
+                        existing_job_id = get_active_build_for_project(project)
+                        if existing_job_id:
+                            cancel_job(existing_job_id, f"Replaced by new build request")
+                            await ws.send_text(json.dumps({
+                                "type": "build_replaced",
+                                "data": {
+                                    "old_job_id": existing_job_id,
+                                    "project": project,
+                                    "message": f"Cancelled previous build for {project}"
+                                }
+                            }))
+
                 job_id = create_job(tab_id, action, msg)
                 await ws.send_text(json.dumps({
                     "type": "job_started",
