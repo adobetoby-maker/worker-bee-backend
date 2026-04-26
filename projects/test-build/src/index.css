@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --surface: hsl(240, 10%, 98%);
+  --surface-elevated: hsl(0, 0%, 100%);
+  --border: hsl(240, 6%, 90%);
+  --border-strong: hsl(240, 6%, 80%);
+  --text-primary: hsl(240, 9%, 9%);
+  --text-secondary: hsl(240, 5%, 41%);
+  --text-tertiary: hsl(240, 4%, 64%);
+  --accent-primary: hsl(262, 83%, 58%);
+  --accent-secondary: hsl(262, 83%, 48%);
+  --accent-gradient-start: hsl(262, 83%, 58%);
+  --accent-gradient-end: hsl(192, 83%, 58%);
+  --success: hsl(142, 76%, 36%);
+}

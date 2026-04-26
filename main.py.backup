@@ -1,0 +1,222 @@
+import asyncio
+import json
+import os
+import uuid
+from datetime import datetime
+from typing import Dict, Any
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+from agent.runner import AgentRunner
+
+load_dotenv(os.path.expanduser("~/worker-bee/.env"))
+
+app = FastAPI(title="Worker Bee Agent")
+app.add_middleware(CORSMiddleware, allow_origins=["*"],
+    allow_methods=["*"], allow_headers=["*"])
+
+# Active WebSocket runners
+runners: Dict[str, AgentRunner] = {}
+
+# Background job store — survives WebSocket drops
+jobs: Dict[str, Dict[str, Any]] = {}
+
+voice_daemon_ws = None
+
+
+def create_job(tab_id: str, action: str, payload: dict) -> str:
+    job_id = f"job_{uuid.uuid4().hex[:8]}"
+    jobs[job_id] = {
+        "id": job_id,
+        "tab_id": tab_id,
+        "action": action,
+        "payload": payload,
+        "status": "queued",
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+        "progress": [],
+        "result": None,
+        "error": None
+    }
+    return job_id
+
+
+def update_job(job_id: str, status: str, progress_msg: str = None, result=None, error=None):
+    if job_id not in jobs:
+        return
+    jobs[job_id]["status"] = status
+    jobs[job_id]["updated_at"] = datetime.now().isoformat()
+    if progress_msg:
+        jobs[job_id]["progress"].append({
+            "time": datetime.now().isoformat(),
+            "message": progress_msg
+        })
+    if result is not None:
+        jobs[job_id]["result"] = result
+    if error is not None:
+        jobs[job_id]["error"] = error
+
+
+async def run_background_job(job_id: str, tab_id: str, msg: dict):
+    update_job(job_id, "running", "Job started")
+
+    # Create a fake WebSocket that saves to job store
+    class JobWebSocket:
+        async def send_text(self, data: str):
+            try:
+                parsed = json.loads(data)
+                msg_type = parsed.get("type", "")
+                msg_data = parsed.get("data", "")
+
+                # Save progress to job
+                update_job(job_id, "running", f"{msg_type}: {str(msg_data)[:200]}")
+
+                # Also forward to real WebSocket if still connected
+                if tab_id in runners:
+                    try:
+                        await runners[tab_id].ws.send_text(data)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    job_ws = JobWebSocket()
+
+    try:
+        runner = AgentRunner(tab_id, job_ws)
+        await runner.handle(msg)
+        update_job(job_id, "complete", "Job finished successfully")
+    except Exception as e:
+        update_job(job_id, "failed", f"Job failed: {str(e)}", error=str(e))
+
+
+# Long running actions that need background jobs
+BACKGROUND_ACTIONS = {
+    "build", "build_start", "browser", "login",
+    "index_site", "plan", "learn_now", "vision_report"
+}
+
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "worker-bee-agent",
+        "version": "3.2.0",
+        "active_runners": len(runners),
+        "active_jobs": len([j for j in jobs.values() if j["status"] == "running"])
+    }
+
+
+@app.get("/api/tags")
+async def tags():
+    import httpx
+    base = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    async with httpx.AsyncClient(timeout=10) as c:
+        r = await c.get(f"{base}/api/tags")
+        return r.json()
+
+
+@app.get("/api/ps")
+async def ps():
+    import httpx
+    base = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    async with httpx.AsyncClient(timeout=10) as c:
+        r = await c.get(f"{base}/api/ps")
+        return r.json()
+
+
+@app.get("/api/jobs")
+async def get_jobs():
+    return {"jobs": list(jobs.values())}
+
+
+@app.get("/api/jobs/{job_id}")
+async def get_job(job_id: str):
+    if job_id not in jobs:
+        return {"error": "Job not found"}
+    return jobs[job_id]
+
+
+@app.delete("/api/jobs/{job_id}")
+async def delete_job(job_id: str):
+    if job_id in jobs:
+        del jobs[job_id]
+    return {"status": "deleted"}
+
+
+@app.websocket("/ws/voice-daemon")
+async def voice_daemon_endpoint(ws: WebSocket):
+    global voice_daemon_ws
+    await ws.accept()
+    voice_daemon_ws = ws
+    print("[VOICE DAEMON] Connected")
+    try:
+        while True:
+            data = await ws.receive_text()
+            msg = json.loads(data)
+            if msg.get("type") == "voice_transcription":
+                for runner in runners.values():
+                    await runner.send("voice_transcription", msg.get("data", {}))
+                    break
+    except Exception:
+        voice_daemon_ws = None
+        print("[VOICE DAEMON] Disconnected")
+
+
+@app.websocket("/ws/{tab_id}")
+async def ws_endpoint(ws: WebSocket, tab_id: str):
+    await ws.accept()
+    runner = AgentRunner(tab_id, ws)
+    runners[tab_id] = runner
+
+    # Send any pending job results for this tab
+    pending = [j for j in jobs.values()
+               if j["tab_id"] == tab_id and j["status"] == "complete"
+               and j.get("result")]
+    for job in pending:
+        try:
+            await ws.send_text(json.dumps({
+                "type": "job_complete",
+                "data": {
+                    "job_id": job["id"],
+                    "action": job["action"],
+                    "result": job["result"],
+                    "progress": job["progress"]
+                }
+            }))
+        except Exception:
+            pass
+
+    try:
+        while True:
+            data = await ws.receive_text()
+            msg = json.loads(data)
+            action = msg.get("action", "")
+
+            # Long running actions → background job
+            if action in BACKGROUND_ACTIONS:
+                job_id = create_job(tab_id, action, msg)
+
+                # Tell frontend immediately
+                await ws.send_text(json.dumps({
+                    "type": "job_started",
+                    "data": {
+                        "job_id": job_id,
+                        "action": action,
+                        "message": f"Running in background — job {job_id}"
+                    }
+                }))
+
+                # Run in background
+                asyncio.create_task(
+                    run_background_job(job_id, tab_id, msg)
+                )
+
+            else:
+                # Fast actions → handle directly
+                asyncio.create_task(runner.handle(msg))
+
+    except WebSocketDisconnect:
+        runners.pop(tab_id, None)
+        await runner.cleanup()
