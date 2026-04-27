@@ -20,6 +20,131 @@ Together we learn from every failure.
 
 No one member can do this alone. That's the point.
 
+## 1.5 Why We Are Four
+
+**You could run one giant model and ask it to do everything.**
+
+qwen3.6:27b, Claude Opus, GPT-4 — they're all capable generalists. Load one model, give it the whole project, let it generate everything. Why bother with four models and all this coordination complexity?
+
+**Because specialization beats generalization for production work. Here's why:**
+
+### Context Contamination
+
+A generalist model doing planning AND building AND checking accumulates context. By the time it's writing the third component, its 32k context window is full of:
+- The planning phase discussion
+- Rejected approaches from earlier
+- Debugging output from failed attempts
+- Previous component code that might influence patterns
+
+**Scout doesn't carry Builder's mistakes into the next build.** Fresh context per phase means no contamination. When Scout writes a brief for the next component, he's thinking about what needs building — not remembering that Builder struggled with imports two components ago.
+
+### Cognitive Load Distribution
+
+**Planning requires different thinking than building.**
+
+Scout uses deepseek-r1 — a reasoning model designed to think deeply before answering. When he writes a technical brief, he's considering architecture, dependencies, edge cases, TypeScript types. That takes tokens. That takes time.
+
+Builder doesn't need to re-think the architecture. Scout already did that. Builder just needs to execute the brief with precision. qwen2.5-coder is optimized for code generation, not architectural reasoning. Give him a clear spec and he builds it fast.
+
+**Watcher doesn't code.** She sees. Vision models are different from code generation models. llava and qwen2.5vl are trained to interpret images, not write TypeScript. When she checks a screenshot, she's doing one thing completely — not context-switching between "write code" and "review visual output."
+
+### RAM Budget Economics
+
+**128GB sounds like a lot until you're running 27B+ parameter models.**
+
+- qwen3.6:27b: 17GB
+- qwen2.5-coder:32b: 28GB  
+- deepseek-r1:14b: 11GB  
+- hermes3:latest: 4.7GB  
+- llava:latest: 8GB
+
+**If we tried to keep qwen3.6:27b loaded all the time:** 17GB resident, leaving 111GB for everything else. That's fine until you need vision (llava), reasoning (deepseek), and routing (hermes) simultaneously.
+
+**Four specialized models with 1-hour keep_alive:** Models unload when not needed. Only the active pipeline phase burns RAM. QueenB (4.7GB) stays warm. Scout (11GB) loads for planning, unloads after. Builder (28GB) loads for building, unloads after. Watcher (8GB) loads for checking, unloads after.
+
+Average RAM usage: 20-40GB instead of 60GB+. That leaves headroom for the system, Chrome, the dev server, Playwright.
+
+### The Handoff Cost
+
+**"But doesn't the handoff between models add latency?"**
+
+Yes. Absolutely.
+
+Scout finishes his brief. Builder cold-starts (2-3 seconds to load). Builder finishes the component. Watcher cold-starts. Total handoff overhead: 5-10 seconds per build.
+
+**But look at what we avoid:**
+
+A generalist model doing everything accumulates context, makes mistakes Scout would have caught, forgets what it planned by the time it's building component 3. When it fails, you don't know which phase failed — planning, building, or checking? All of it is entangled.
+
+**With four models:** Scout fails? The brief is bad. Fix the brief, re-run. Builder fails? The code is wrong. Scout's brief was fine. Fix the code. Watcher fails? The check is wrong. Code AND brief were fine. Fix the checker.
+
+**Isolated failure = faster iteration.**
+
+### The Human Team Analogy
+
+**Real software teams don't have one person do everything.**
+
+You have architects who design systems. Developers who implement them. QA who validates them. Not because humans can't multitask, but because **specialization makes each phase better**.
+
+The architect who thinks deeply about data flow doesn't want to context-switch to "now write 500 lines of boilerplate." The developer implementing the spec doesn't want to re-debate the architecture mid-build. The QA engineer checking for regressions shouldn't be the same person who wrote the code.
+
+**We're structured like a real team because real teams work.**
+
+QueenB = Tech Lead (routes work, tracks progress, escalates blockers)  
+Scout = Architect (designs the approach, writes the spec)  
+Builder = Senior Dev (implements the spec, fixes issues)  
+Watcher = QA Engineer (validates output, finds regressions)
+
+### When One Model Wins
+
+**There ARE cases where a single generalist beats the pipeline:**
+
+**1. Exploratory prototyping** — "Try three different approaches and show me what they look like."  
+A generalist can iterate faster without handoffs. Scout → Builder → Watcher is overkill when you're just sketching ideas.
+
+**2. Tiny tasks** — "Fix this typo."  
+The overhead of routing through QueenB, briefing Scout, loading Builder is absurd. Just fix it.
+
+**3. Creative synthesis** — "Write a blog post about our architecture."  
+This isn't a pipeline task. It's a single creative output. One model, one shot.
+
+**But for production builds of multi-component systems:** Scout → Builder → Watcher wins. Because we're not prototyping. We're shipping.
+
+### The Test We're Running Right Now
+
+**As you read this, we're testing the hypothesis.**
+
+Test A: qwen3.6:27b solo, full project context, build a contact form.  
+Test B: Four-model pipeline, same task.
+
+Metrics:  
+- Build completed: yes/no  
+- First attempt import errors: count  
+- Iterations to completion: count  
+- Total time: minutes  
+- Broken styling: yes/no  
+
+**If qwen3.6 solo wins:** We simplify. The complexity isn't earning its keep.  
+**If the pipeline wins:** We know specialization is paying for itself.
+
+No spin. Just data.
+
+### Why This Matters
+
+**Most AI agent frameworks use one model.**
+
+They load Claude Opus or GPT-4, give it a massive system prompt with 47 tools, and hope it picks the right thing. When it fails, you don't know why. Was the prompt unclear? Tool choice wrong? Context too big? Model having an off day?
+
+**We know which model failed because only one was working.**
+
+Scout writes a bad brief → we see it in the brief before Builder starts.  
+Builder writes bad code → Scout's brief is saved, we can compare.  
+Watcher misses a bug → Scout and Builder's outputs are logged.
+
+**Debugging a pipeline is easier than debugging a black box.**
+
+That's why we're four.
+
 ## Why We Exist
 
 Toby got tired of paying for services that should just work locally. Viktor.ai, Lovable, Claude API — all expensive, all doing things a Mac Studio can do for free overnight.
