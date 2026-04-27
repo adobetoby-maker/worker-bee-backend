@@ -6,7 +6,7 @@ from .tools.memory import MemoryTool
 from .tools.planner import TaskPlanner
 
 OLLAMA = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-MODEL  = os.getenv("DEFAULT_MODEL", "phi4:latest")
+MODEL  = os.getenv("DEFAULT_MODEL", "hermes3:latest")
 
 # Context window sizes for RAM management
 MODEL_CONTEXT_SIZES = {
@@ -15,7 +15,7 @@ MODEL_CONTEXT_SIZES = {
     "deepseek-r1:32b": 8192,      # 8k for planning briefs
     "llava:latest": 8192,         # 8k for vision
     "qwen2.5vl:7b": 8192,        # 8k for vision
-    "phi4:latest": 8192,          # 8k for routing
+    "hermes3:latest": 131072,     # 131k for orchestration - 8x more context than phi4
 }
 
 def get_num_ctx(model: str) -> int:
@@ -52,7 +52,7 @@ class ManifestLoader:
     @classmethod
     def load_for_model(cls, model: str) -> str:
         model_map = {
-            "phi4:latest":       "identity-phi4",
+            "hermes3:latest":    "identity-hermes3",
             "deepseek-r1:14b":   "identity-deepseek",
             "deepseek-r1:32b":   "identity-deepseek",
             "qwen2.5-coder:32b": "identity-qwen",
@@ -101,7 +101,7 @@ def pick_model(message: str) -> str:
         "comprehensive"
     ]):
         return "deepseek-r1:14b"
-    return "phi4:latest"
+    return "hermes3:latest"
 
 
 def should_escalate_to_claude(message: str) -> bool:

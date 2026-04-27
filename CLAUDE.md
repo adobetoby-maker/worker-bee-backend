@@ -94,7 +94,7 @@ Go somewhere new. Fail. Learn. Rewrite. That's how the hive grows.
 ## The Model Stack
 
 ```
-phi4:latest          ← Queen/Controller — fast routing
+hermes3:latest       ← Queen/Controller — fast routing, 131k context
 deepseek-r1:14b      ← Planner — deep reasoning  
 qwen2.5-coder:32b    ← Builder — all code generation
 llava:latest         ← Checker — vision (temporary, RAM limited)
@@ -131,7 +131,7 @@ manifests/
 ├── voice.md                   ✅ done
 ├── runner-narrator.md         ✅ done
 ├── ref-site-registry.md       ✅ done
-├── identity-phi4.md           ✅ done
+├── identity-hermes3.md           ✅ done
 ├── identity-deepseek.md       ✅ done
 ├── identity-qwen.md           ✅ done
 ├── identity-qwen2.5vl.md      ✅ done (renamed from identity-llava.md)
@@ -228,7 +228,7 @@ checklist for all plans, diagnoses, and architectural decisions.
 1. **Complete files only** — never partial edits, never "add this section"
 2. **Explain the why** — Toby learns by understanding, not just copying
 3. **No SSL on uvicorn** — Cloudflare handles SSL termination
-4. **Default model is phi4:latest** — not llama3.3 (deleted), not deepseek
+4. **Default model is hermes3:latest — QueenB with 131k context for orchestration
 5. **Manifests inject automatically** — ManifestLoader in runner.py handles this
 6. **Status emissions** — every action must emit [MODEL:STEP] narrator format
 

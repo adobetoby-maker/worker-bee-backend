@@ -75,7 +75,7 @@
 
 ### Model Stack
 ```
-phi4:latest          — Queen/Controller (fast routing)
+hermes3:latest       — Queen/Controller (fast routing, 131k context)
 deepseek-r1:14b      — Planner (deep reasoning)
 qwen2.5-coder:32b    — Builder (all code generation)
 llava:latest         — Checker (vision, temporary)
